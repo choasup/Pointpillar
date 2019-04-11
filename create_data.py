@@ -1,6 +1,7 @@
 import copy
 import pathlib
 import pickle
+import os
 
 import fire
 import numpy as np
@@ -57,15 +58,15 @@ def _calculate_num_points_in_gt(data_path, infos, relative_path, remove_outside=
             [num_points_in_gt, -np.ones([num_ignored])])
         annos["num_points_in_gt"] = num_points_in_gt.astype(np.int32)
 
-# -- 1.Create KITTI Info File.
+# -- 1.Create KITTI info file.
 def create_kitti_info_file(data_path,
                            save_path=None,
                            create_trainval=False,
                            relative_path=True):
-    train_img_ids = _read_imageset_file("./train.txt")
-    val_img_ids = _read_imageset_file("./val.txt")
-    trainval_img_ids = _read_imageset_file("./trainval.txt")
-    test_img_ids = _read_imageset_file("./test.txt")
+    train_img_ids = _read_imageset_file(os.path.join(data_path, "train.txt"))
+    val_img_ids = _read_imageset_file(os.path.join(data_path, "val.txt"))
+    trainval_img_ids = _read_imageset_file(os.path.join(data_path, "trainval.txt"))
+    test_img_ids = _read_imageset_file(os.path.join(data_path, "test.txt"))
 
     print("Generate info. this may take several minutes.")
     if save_path is None:
@@ -73,7 +74,6 @@ def create_kitti_info_file(data_path,
     else:
         save_path = pathlib.Path(save_path)
 
-    from IPython import embed; embed()
     kitti_infos_train = kitti.get_kitti_image_info(
         data_path,
         training=True,
@@ -131,7 +131,6 @@ def create_kitti_info_file(data_path,
     with open(filename, 'wb') as f:
         pickle.dump(kitti_infos_test, f)
 
-
 def _create_reduced_point_cloud(data_path,
                                 info_path,
                                 save_path=None,
@@ -167,7 +166,7 @@ def _create_reduced_point_cloud(data_path,
         with open(save_filename, 'w') as f:
             points_v.tofile(f)
 
-
+# -- 2. Remove outside point of camera, maybe it is not valid for others dataset.
 def create_reduced_point_cloud(data_path,
                                train_info_path=None,
                                val_info_path=None,
@@ -192,7 +191,7 @@ def create_reduced_point_cloud(data_path,
         _create_reduced_point_cloud(
             data_path, test_info_path, save_path, back=True)
 
-
+# -- 3. Create groundtruth instance. if not kitti, it is necessary to set @used_classes.
 def create_groundtruth_database(data_path,
                                 info_path=None,
                                 used_classes=None,
@@ -236,6 +235,8 @@ def create_groundtruth_database(data_path,
         rect = info['calib/R0_rect']
         P2 = info['calib/P2']
         Trv2c = info['calib/Tr_velo_to_cam']
+        
+        # Be careful for other datasets.
         if not lidar_only:
             points = box_np_ops.remove_outside_points(points, rect, Trv2c, P2,
                                                         info["img_shape"])
